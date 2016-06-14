@@ -22,6 +22,7 @@ class GuiPart:
 
     def processIncoming(self):
         """Handle all messages currently in the queue, if any."""
+        print "gui process incoming"
         while self.queue.qsize(  ):
             try:
                 msg = self.queue.get(0)
@@ -71,7 +72,7 @@ class ThreadedClient:
         """
         Check every 200 ms if there is something new in the queue.
         """
-        
+        #pdb.set_trace()
         if self.running:
             # This is the brutal stop of the system. You may want to do
             # some cleanup before actually shutting it down.
@@ -85,18 +86,24 @@ class ThreadedClient:
         a 'select(  )'. One important thing to remember is that the thread has
         to yield control pretty regularly, by select or otherwise.
         """
-        while self.running:
+
+        while 1:
             # To simulate asynchronous I/O, we create a random number at
             # random intervals. Replace the following two lines with the real
             # thing.
-            time.sleep(rand.random(  ) * 1.5)
-            msg = rand.random(  )
-            self.queue.put(msg)
+            if self.running:
+                print "worker thread"
+                time.sleep(rand.random(  ) * 1.5)
+                msg = rand.random(  )
+                self.queue.put(msg)
+            else:
+                pass
 
     def endApplication(self):
         self.running = 0
 
     def startApplication(self):
+        #pdb.set_trace()
         self.running = 1
 
 rand = random.Random(  )
