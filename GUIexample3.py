@@ -7,9 +7,13 @@ import random
 import Queue
 import pdb
 
+
+import ilevildataread
+
 class GuiPart:
     def __init__(self, master, queue, startCommand, endCommand):
         self.queue = queue
+
         # Set up the GUI
         consoleStart = Tkinter.Button(master, text='Start', command=startCommand)
         consoleStart.pack(  )
@@ -22,7 +26,7 @@ class GuiPart:
 
     def processIncoming(self):
         """Handle all messages currently in the queue, if any."""
-        print "gui process incoming"
+        #print "gui process incoming"
         while self.queue.qsize(  ):
             try:
                 msg = self.queue.get(0)
@@ -50,6 +54,9 @@ class ThreadedClient:
         the GUI as well. We spawn a new thread for the worker (I/O).
         """
         self.master = master
+
+
+        self.rdd = ilevildataread.ReadData()
 
         # Create the queue
         self.queue = Queue.Queue(  )
@@ -86,13 +93,12 @@ class ThreadedClient:
         a 'select(  )'. One important thing to remember is that the thread has
         to yield control pretty regularly, by select or otherwise.
         """
-
         while 1:
             # To simulate asynchronous I/O, we create a random number at
             # random intervals. Replace the following two lines with the real
             # thing.
             if self.running:
-                print "worker thread"
+                #print "worker thread"
                 time.sleep(rand.random(  ) * 1.5)
                 msg = rand.random(  )
                 self.queue.put(msg)
@@ -101,10 +107,12 @@ class ThreadedClient:
 
     def endApplication(self):
         self.running = 0
+        self.rdd.Stop()
 
     def startApplication(self):
         #pdb.set_trace()
         self.running = 1
+        self.rdd.Start()
 
 rand = random.Random(  )
 root = Tkinter.Tk(  )

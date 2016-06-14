@@ -21,7 +21,7 @@ import serial;
 
 
 class ReadData:
-    def __init__(self, Output=None, Port='COM5', Log=None):
+    def __init__(self, Output=None, Port='/dev/ttyUSB0', Log=None):
         self.ser = None;
         self.port = Port;
         self.alive = False;
@@ -62,7 +62,7 @@ class ReadData:
             self.waitEnd.set();
 
         self.alive = False;
-        self.stop();
+        self.Stop();
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     def CreateCrc16Table(self):
         for i in range(256):
@@ -141,7 +141,7 @@ class ReadData:
             self.thread_read = threading.Thread(target=self.FirstReader);
             self.thread_read.setDaemon(1);
             self.thread_read.start();
-            self.thread_read.join()
+            #self.thread_read.join()
             return True;
         else:
             return False;
@@ -566,14 +566,14 @@ class ReadData:
                 self.SetStopEvent()
 
 
-        self.waitEnd.set();
-        self.alive = False;
-        self.ser.close()
-        self.file_address.colse()
+        #self.waitEnd.set();
+        # self.alive = False;
+        # self.ser.close()
+        # self.file_address.colse()
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    def stop(self):
+    def Stop(self):
 
 
 
