@@ -8,11 +8,16 @@ import Queue
 import pdb
 
 class GuiPart:
-    def __init__(self, master, queue, endCommand):
+    def __init__(self, master, queue, startCommand, endCommand):
         self.queue = queue
         # Set up the GUI
-        console = Tkinter.Button(master, text='Done', command=endCommand)
-        console.pack(  )
+        consoleStart = Tkinter.Button(master, text='Start', command=startCommand)
+        consoleStart.pack(  )
+
+        consoleEnd = Tkinter.Button(master, text='End', command=endCommand)
+        consoleEnd.pack(  )
+
+
         # Add more GUI stuff here depending on your specific needs
 
     def processIncoming(self):
@@ -49,11 +54,11 @@ class ThreadedClient:
         self.queue = Queue.Queue(  )
 
         # Set up the GUI part
-        self.gui = GuiPart(master, self.queue, self.endApplication)
+        self.gui = GuiPart(master, self.queue, self.startApplication, self.endApplication)
 
         # Set up the thread to do asynchronous I/O
         # More threads can also be created and used, if necessary
-        self.running = 1
+        self.running = 0
         self.thread1 = threading.Thread(target=self.workerThread1)
 
         self.thread1.start(  )
@@ -66,12 +71,12 @@ class ThreadedClient:
         """
         Check every 200 ms if there is something new in the queue.
         """
-        self.gui.processIncoming(  )
-        if not self.running:
+        
+        if self.running:
             # This is the brutal stop of the system. You may want to do
             # some cleanup before actually shutting it down.
-            import sys
-            sys.exit(1)
+            self.gui.processIncoming(  )
+
         self.master.after(200, self.periodicCall)
 
     def workerThread1(self):
@@ -90,6 +95,9 @@ class ThreadedClient:
 
     def endApplication(self):
         self.running = 0
+
+    def startApplication(self):
+        self.running = 1
 
 rand = random.Random(  )
 root = Tkinter.Tk(  )
