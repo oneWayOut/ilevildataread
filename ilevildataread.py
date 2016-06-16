@@ -4,7 +4,7 @@
 # iLevil_data_read.py have the function ofreading data from iLevil and save data
 # It creates a file called flight_data in D:\
 # It creates a txt with the name of local time in D:\flight_data
-# The serial port that you will use should be input.The default value is 'COM5'
+# The serial port that you will use should be input.The default value is 'COM5'，
 
 
 
@@ -21,8 +21,19 @@ import serial;
 
 
 class ReadData:
-    def __init__(self, Output=None, Port='/dev/ttyUSB0', Log=None):
+    def __init__(self, Output=None, Port='COM5', Log=None):
+        #Port='/dev/ttyUSB0'
         self.ser = None;
+
+
+        self.logCppClock = False
+        
+        if self.logCppClock:
+            import py_rt_module
+            rt_module = py_rt_module.PyRT_Module()
+            rt_module.start()  
+            print "connection with RT_Timer done"
+            
         self.port = Port;
         self.alive = False;
         self.stopFlag = False;
@@ -40,15 +51,26 @@ class ReadData:
         self.file_address=None
         self.file_name=''
 
-        self.time_computer='';
+        self.LocalTime_UTC='';
 
         self.data= [];
         self.messagepackage={};
         self.messagepackage_status=0
-        #self.messageID={'messageID_time':'\x00','messageID_GPS':'0A','messageID_HGPS':'0B',
-                       #'messageID_status':['L','E','00','02'],'messageID_AHRS':['L','E','01','01'],
-                       #'messageID_GPS_status':['L','E','07'],'messageID_confcommand':['L','E','0F']}
 
+        self.messagepackage={'cppClockLine':'00:00:00','LocalTime_UTC':time.localtime(time.time()),'Time_Stamp_GPS':'00:00:00',\
+        'Firmware_version':4.7,'Battery_Level':'100',\
+        'Low_voltage_error':'Low_Votage','Excess_temperature':'T_normal',\
+        'Roll_excess_error':'Roll_normal','Pitch_excess_error':'Pitch_normal','Yaw_excess_error':'Yaw_normal',\
+        'Satellites':0,'GPS_signal_power':'0',\
+        'Latitude':0,'Longitude':0,\
+        'P_Alt_GPS':0,'GS_GPS':0,\
+        'VSI_GPS':0,'T_H_status':'T',\
+        'Track_Heading':0,'GPS_Alt':0,\
+        'Roll':0,'Pitch':0,\
+        'Yaw':0,'Inclination':0,\
+        'Turn_Rate':0,'G_load':0,\
+        'IAS':0,'P_Alt_AHRS':0,\
+        'VSI_AHRS':0}
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=++
     def Waiting(self):
@@ -79,27 +101,15 @@ class ReadData:
         self.ser = serial.Serial();
         self.ser.port = self.port;
         self.ser.baudrate = 230400;
-        #self.ser.timeout = 0.5;
+       
 
         self.ser.parity=serial.PARITY_NONE;
         self.ser.stopbits=serial.STOPBITS_ONE;
-        self.ser.bytesize=serial.EIGHTBITS ;#字节大小
+        self.ser.bytesize=serial.EIGHTBITS ;
+        
         self.CreateCrc16Table()
-        #self.re_num = re.compile('\d');
-        #print 'start normal'
-        self.messagepackage={'time_computer':time.localtime(time.time()),'Time_Stamp':'00:00:00',\
-        'Firmware_version':4.7,'Battery_Level':'100',\
-        'Low_voltage_error':'Low_Votage','Excess_temperature':'T_normal',\
-        'Satellites':0,'GPS_signal_power':'0',\
-        'Latitude':0,'Longitude':0,\
-        'P_Alt_GPS':0,'GS_GPS':0,\
-        'VSI_GPS':0,'T_H_status':'T',\
-        'Track_Heading':0,'GPS_Alt':0,\
-        'Roll':0,'Pitch':0,\
-        'Yaw':0,'Inclination':0,\
-        'Turn_Cord':0,'G_load':0,\
-        'IAS':0,'P_Alt_AHRS':0,\
-        'VSI_AHRS':0}
+        
+    
 
         try:
 
@@ -111,10 +121,11 @@ class ReadData:
             self.file_address=open(self.file_name,'w')
 
 
-            #Head of the file
-            self.file_address.writelines('%-20s'%('LocalTime_UTC')+'%-20s'%('Time_Stamp_GPS')+\
+            #Wirte Headline in the file
+            self.file_address.writelines('%-20s'%('cppClockLine')+'%-20s'%('LocalTime_UTC')+'%-20s'%('Time_Stamp_GPS')+\
                                      '%-20s'%('Firmware_version')+'%-20s'%('Battery_Level')+\
                                      '%-30s'%('Low_voltage_error')+'%-20s'%('Excess_temperature')+\
+                                     '%-20s'%('Roll_excess_error')+'%-20s'%('Pitch_excess_error')+'%-20s'%('Yaw_excess_error')+\
                                      '%-20s'%('Satellites')+'%-20s'%('GPS_signal_power')+\
                                      '%-20s'%('Latitude')+'%-20s'%('Longitude')+\
                                      '%-20s'%('P_Alt_GPS')+'%-20s'%('GS_GPS')+\
@@ -122,7 +133,7 @@ class ReadData:
                                      '%-20s'%('Track_Heading')+'%-20s'%('GPS_Alt')+\
                                      '%-10s'%('Roll')+'%-10s'%('Pitch')+\
                                      '%-10s'%('Yaw')+'%-20s'%('Inclination')+\
-                                     '%-10s'%('Turn_Cord')+'%-10s'%('G_load')+\
+                                     '%-10s'%('Turn_Rate')+'%-10s'%('G_load')+\
                                      '%-10s'%('IAS')+'%-20s'%('P_Alt_AHRS')+\
                                      '%-20s'%('VSI_AHRS')+'\n')      
         except Exception,ex:
@@ -141,7 +152,7 @@ class ReadData:
             self.thread_read = threading.Thread(target=self.FirstReader);
             self.thread_read.setDaemon(1);
             self.thread_read.start();
-            #self.thread_read.join()
+          
             return True;
         else:
             return False;
@@ -161,6 +172,7 @@ class ReadData:
 
             if character_7D1==0x7D or character_7D1==0x7E:
 
+
                 dat_message[index_7D+1]=chr(character_7D1)
                 del(dat_message[index_7D])
             else:
@@ -177,8 +189,6 @@ class ReadData:
         # FCS is CRC-CCITT
         #Caculate FCS on the clear message, match with the FCS character in the message
         #if equal,save the message,otherwise discard it
-
-
 
         FCS=(ord(d_message[-1])<<8)+ord(d_message[-2])
         del d_message[-2:]
@@ -208,12 +218,12 @@ class ReadData:
             for i in range(num_message):
                 i_message[i]=ord(i_message[i])
 
-            Time_Stamp_int=(i_message[4]<<8)+i_message[3]+((i_message[2]&0x80)<<9)
-            time_h=Time_Stamp_int/3600
-            time_m=int((Time_Stamp_int/3600.0-Time_Stamp_int/3600)*60)
-            time_s=int(((Time_Stamp_int/3600.0-Time_Stamp_int/3600)*60-int((Time_Stamp_int/3600.0-Time_Stamp_int/3600)*60))*60)
+            Time_Stamp_GPS_int=(i_message[4]<<8)+i_message[3]+((i_message[2]&0x80)<<9)
+            time_h=Time_Stamp_GPS_int/3600
+            time_m=int((Time_Stamp_GPS_int/3600.0-Time_Stamp_GPS_int/3600)*60)
+            time_s=int(((Time_Stamp_GPS_int/3600.0-Time_Stamp_GPS_int/3600)*60-int((Time_Stamp_GPS_int/3600.0-Time_Stamp_GPS_int/3600)*60))*60)
 
-            self.messagepackage['Time_Stamp']=str(time_h)+':'+str(time_m)+':'+str(time_s)
+            self.messagepackage['Time_Stamp_GPS']=str(time_h)+':'+str(time_m)+':'+str(time_s)
 
 
             self.messagepackage_status=1
@@ -291,6 +301,11 @@ class ReadData:
 
                 self.messagepackage['Firmware_version']=i_message[4]*0.1;
                 self.messagepackage['Battery_Level']=i_message[5];
+                #print i_message[4]
+                #print i_message[5]
+                #print i_message[6]
+                #print i_message[7]
+                
 
 
                 if (i_message[6]&8)==8:
@@ -302,6 +317,22 @@ class ReadData:
                     self.messagepackage['Excess_temperature']='T>60'
                 else:
                     self.messagepackage['Excess_temperature']='T_normal'
+
+                if (i_message[6]&32)==32:
+                    self.messagepackage['Roll_excess_error']='Roll_error'
+                else:
+                    self.messagepackage['Roll_excess_error']='Roll_normal'
+
+                if (i_message[6]&64)==64:
+                    self.messagepackage['Pitch_excess_error']='Pitch_error'
+                else:
+                    self.messagepackage['Pitch_excess_error']='Pitch_normal'
+
+                if (i_message[6]&128)==128:
+                    self.messagepackage['Yaw_excess_error']='Yaw_error'
+                else:
+                    self.messagepackage['Yaw_excess_error']='Yaw_normal'
+                    
 
                 if (i_message[8]&1)==1:
                     self.messagepackage['WAAS_GPS_Status']='WAAS_enabled'
@@ -318,14 +349,7 @@ class ReadData:
 
                 #Power
                 self.messagepackage['GPS_signal_power']=((i_message[6]<<8)+i_message[7])*0.1
-                #GPS_signal_power=((i_message[6]<<8)+i_message[7])*0.1
 
-                #if (GPS_signal_power>=0) and (GPS_signal_power<=29.9):
-                    #self.messagepackage['GPS_signal_power']='Low'
-                #elif (GPS_signal_power>=30) and (GPS_signal_power<=39.9):
-                    #self.messagepackage['GPS_signal_power']='Nominal'
-                #else:
-                    #self.messagepackage['GPS_signal_power']='High'
 
                 # Altitude variation
 
@@ -364,9 +388,9 @@ class ReadData:
 
                 #Turn Coordinator
                 if (i_message[12]&128) == 128:
-                    self.messagepackage['Turn_Cord']=-(((i_message[12]-128)<<8)+i_message[13])*0.1;
+                    self.messagepackage['Turn_Rate']=-(((i_message[12]-128)<<8)+i_message[13])*0.1;
                 else:
-                    self.messagepackage['Turn_Cord']=((i_message[12]<<8)+i_message[13])*0.1;
+                    self.messagepackage['Turn_Rate']=((i_message[12]<<8)+i_message[13])*0.1;
 
                 #G load
                 if (i_message[14]&128) == 128:
@@ -400,62 +424,47 @@ class ReadData:
         if self.file_address.closed is True:
             self.file_address=open(self.file_name,'a+');
 
+        cppClockLine = ""
+        if self.logCppClock:
+            cppTime = rt_module.get_time() # Get the real time value
+            cppClockLine = str(cppTime)+","
 
-
-        self.file_address.writelines('%-20s'%(self.time_computer)+'%-20s'%(self.messagepackage['Time_Stamp'])+\
-        '%-20.1f'%(float(self.messagepackage['Firmware_version']))+'%-20.0f'%(float(self.messagepackage['Battery_Level']))+\
+        self.file_address.writelines('%-20s'% cppClockLine+'%-20s'%(self.LocalTime_UTC)+'%-20s'%(self.messagepackage['Time_Stamp_GPS'])+\
+        '%-20.1f'%(float(self.messagepackage['Firmware_version']))+'%-20.1f'%(float(self.messagepackage['Battery_Level']))+\
         '%-30s'%(self.messagepackage['Low_voltage_error'])+'%-20s'%(self.messagepackage['Excess_temperature'])+\
-        '%-20d'%(int(self.messagepackage['Satellites']))+'%-20.0f'%(float(self.messagepackage['GPS_signal_power']))+\
+        '%-20s'%(self.messagepackage['Roll_excess_error'])+'%-20s'%(self.messagepackage['Pitch_excess_error'])+'%-20s'%(self.messagepackage['Yaw_excess_error'])+\
+        '%-20d'%(int(self.messagepackage['Satellites']))+'%-20.1f'%(float(self.messagepackage['GPS_signal_power']))+\
         '%-20.8f'%(float(self.messagepackage['Latitude']))+'%-20.8f'%(float(self.messagepackage['Longitude']))+\
         '%-20d'%(int(self.messagepackage['P_Alt_GPS']))+'%-20d'%(int(self.messagepackage['GS_GPS']))+\
         '%-20d'%(int(self.messagepackage['VSI_GPS']))+'%-20s'%(self.messagepackage['T_H_status'])+\
         '%-20.1f'%(float(self.messagepackage['Track_Heading']))+'%-20d'%(int(self.messagepackage['GPS_Alt']))+\
         '%-10.1f'%(float(self.messagepackage['Roll']))+'%-10.1f'%(float(self.messagepackage['Pitch']))+\
         '%-10.1f'%(float(self.messagepackage['Yaw']))+'%-20.1f'%(float(self.messagepackage['Inclination']))+\
-        '%-10.1f'%(float(self.messagepackage['Turn_Cord']))+'%-10.2f'%(float(self.messagepackage['G_load']))+\
+        '%-10.1f'%(float(self.messagepackage['Turn_Rate']))+'%-10.2f'%(float(self.messagepackage['G_load']))+\
         '%-10.1f'%(float(self.messagepackage['IAS']))+'%-20d'%(int(self.messagepackage['P_Alt_AHRS']))+\
         '%-20d'%(int(self.messagepackage['VSI_AHRS']))+'\n')
 
         #print 'savedata normal'
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     def SendData(self):
-        Result={'time_computer':self.time_computer,'Time_Stamp':self.messagepackage['Time_Stamp'],
-                'Firmware_version':self.messagepackage['Firmware_version'],'Battery_Level':self.messagepackage['Battery_Level'],
-                'Low_voltage_error':self.messagepackage['Low_voltage_error'],'Excess_temperature':self.messagepackage['Excess_temperature'],
-                'Satellites':self.messagepackage['Satellites'],'GPS_signal_power':self.messagepackage['GPS_signal_power'],
-                'Latitude':self.messagepackage['Latitude'],'Longitude':self.messagepackage['Longitude'],
-                'P_Alt_GPS':self.messagepackage['P_Alt_GPS'],'GS_GPS':self.messagepackage['GS_GPS'],
-                'VSI_GPS':self.messagepackage['VSI_GPS'],'T_H_status':self.messagepackage['T_H_status'],
-                'Track_Heading':self.messagepackage['Track_Heading'],'GPS_Alt':self.messagepackage['GPS_Alt'],
-                'Roll':self.messagepackage['Roll'],'Pitch':self.messagepackage['Pitch'],
-                'Yaw':self.messagepackage['Yaw'],'Inclination':self.messagepackage['Inclination'],
-                'Turn_Cord':self.messagepackage['Turn_Cord'],'G_load':self.messagepackage['G_load'],
-                'IAS':self.messagepackage['IAS'],'P_Alt_AHRS':self.messagepackage['P_Alt_AHRS'],
-                'VSI_AHRS':self.messagepackage['VSI_AHRS']}
-        template= '''%(self.time_computer)-20s %(self.messagepackage['Time_Stamp'])-20s\
-        %(self.messagepackage['Firmware_version'])-20.1f %(self.messagepackage['Battery_Level'])-20d\
-        %(self.messagepackage['Low_voltage_error'])-30s %(self.messagepackage['Excess_temperature'])-20s \
-        %(self.messagepackage['Satellites'])-20d %(self.messagepackage['GPS_signal_power'])-20.1f \
-        %(self.messagepackage['Latitude'])-20.8f %(self.messagepackage['Longitude'])-20.8f \
-        %(self.messagepackage['P_Alt_GPS'])-20d %(self.messagepackage['GS_GPS'])-20d \
-        %(self.messagepackage['VSI_GPS'])-20d %(self.messagepackage['T_H_status'])-20s \
-        %(self.messagepackage['Track_Heading'])-20.1f %(self.messagepackage['GPS_Alt'])-20d \
-        %(self.messagepackage['Roll'])-10.1f %(self.messagepackage['Pitch'])-10.1f \
-        %(self.messagepackage['Yaw'])-10.1f %(self.messagepackage['Inclination'])-20.1f \
-        %(self.messagepackage['Turn_Cord'])-10.1f %(self.messagepackage['G_load'])-10.2f \
-        %(self.messagepackage['IAS'])-10.1f %(self.messagepackage['P_Alt_AHRS'])-20d \
-        %(self.messagepackage['VSI_AHRS'])-20d \n'''
 
-        print template % Result
+        
+        print self.messagepackage['Roll']
+        print self.messagepackage['Pitch']
+        print self.messagepackage['Yaw']
+        #print self.messagepackage['Time_Stamp_GPS']
+        pass
 
 
-        return Result
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     def FirstReader(self):
 
+        time.sleep(2)
 
 
         while (self.alive and (not self.stopFlag)):
@@ -472,27 +481,10 @@ class ReadData:
                     continue
 
                 num=len(self.data)
-                #print type(self.data)
-
-                #print '%d' %num
-
-                self.time_computer=time.strftime('%H:%M:%S',time.localtime(time.time()))
-                #print '\n%s\n'%self.time_computer
-                #self.file_address.write(self.time_computer)
-                #self.file_address.write('\n')
 
 
-                #data_temp=[]
-                #set the condition to shut down the programme,it will be changed later
-                #for i in range(len(self.data)):
-                    #data_temp.append(binascii.hexlify(self.data[i]))
-                    #print data_temp[i]
-
-
-                #self.file_address.writelines(self.data)
-
-
-
+                self.LocalTime_UTC=time.strftime('%H:%M:%S',time.localtime(time.time()))
+                print self.LocalTime_UTC
 
 
                 # Process the frame of data received
@@ -512,6 +504,7 @@ class ReadData:
                 # otherwise break,
 
                 if (len(self.data)>2) and (ord(self.data[1])!=0x7E):
+
 
                     pass
                 else:
@@ -566,16 +559,9 @@ class ReadData:
                 self.SetStopEvent()
 
 
-        #self.waitEnd.set();
-        # self.alive = False;
-        # self.ser.close()
-        # self.file_address.colse()
-
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     def Stop(self):
-
-
 
         if not self.waitEnd is None:
             self.waitEnd.set();
@@ -595,6 +581,7 @@ class ReadData:
 
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 
